@@ -540,4 +540,18 @@ MIT License — Voir `LICENSE` pour les détails.
 
 ---
 
+## 🤝 Contributeurs
+
+Ce projet a été développé avec passion par :
+
+- 👨‍💻 **Hinimdou Morsia**  
+- 👨‍💻 **Nankouli Marc Thierry**
+
+---
+
+💡 Ce projet suit une approche ouverte et collaborative. Toute contribution est la bienvenue pour améliorer SCA Desktop et enrichir ses fonctionnalités.
+
+
 *SCA Desktop v1.1 — Mars 2026 — Conçu pour automatiser votre recherche de stage avec éthique et efficacité.*
+
+
