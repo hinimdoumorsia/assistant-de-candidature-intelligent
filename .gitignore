@@ -1,0 +1,48 @@
+# === SÉCURITÉ - Ne jamais committer ===
+.env
+*.env
+sca_data.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.egg
+.eggs/
+
+# === Environnements virtuels ===
+venv/
+env/
+ENV/
+.venv/
+
+# === IDEs ===
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Données utilisateur ===
+exports/
+uploads/
+*.pdf
+logs/
+*.log
+
+# === Alembic versions (garder le dossier, pas les données) ===
+database/versions/*.pyc
