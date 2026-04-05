@@ -540,7 +540,7 @@ MIT License — Voir `LICENSE` pour les détails.
 
 ---
 
-## 🤝 Contributeurs
+##  Contributeurs
 
 Ce projet a été développé avec passion par :
 
