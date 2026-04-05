@@ -1,4 +1,19 @@
+<p align="center">
+
+<img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white" />
+<img src="https://img.shields.io/badge/PyQt6-UI-green?logo=qt&logoColor=white" />
+<img src="https://img.shields.io/badge/Claude-AI-orange?logo=anthropic&logoColor=white" />
+<img src="https://img.shields.io/badge/Playwright-Scraping-purple?logo=playwright&logoColor=white" />
+<img src="https://img.shields.io/badge/SQLite-Database-lightblue?logo=sqlite&logoColor=white" />
+<img src="https://img.shields.io/badge/SQLAlchemy-ORM-red?logo=databricks&logoColor=white" />
+<img src="https://img.shields.io/badge/scikit--learn-ML-yellow?logo=scikitlearn&logoColor=black" />
+<img src="https://img.shields.io/badge/ReportLab-PDF-black?logo=adobeacrobatreader&logoColor=white" />
+
+</p>
+
+
 # 🎯 SCA Desktop — Système de Candidature Automatique aux Stages
+
 
 > **Application desktop Python/PyQt6** qui automatise la veille d'offres de stage et la préparation des candidatures, avec IA Claude intégrée.
 
