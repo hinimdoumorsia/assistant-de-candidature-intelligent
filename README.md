@@ -12,10 +12,26 @@
 </p>
 
 
-# 🎯 SCA Desktop — Système de Candidature Automatique aux Stages
+#  SCA Desktop — Système de Candidature Automatique aux Stages
 
 
-> **Application desktop Python/PyQt6** qui automatise la veille d'offres de stage et la préparation des candidatures, avec IA Claude intégrée.
+<div style="border: 2px solid #1DB954; padding: 15px; border-radius: 10px; background-color: #F8FFFE;">
+
+<h2 style="color:#1DB954; margin-top:0;">🚀 Introduction à notre application</h2>
+
+<p>
+SCA Desktop est une application intelligente conçue pour automatiser l’ensemble du processus de recherche de stages.
+Elle combine le scraping multi-sources, l’analyse de données et l’intelligence artificielle afin d’optimiser la détection
+des opportunités, améliorer la qualité des candidatures et accompagner l’utilisateur à chaque étape de son parcours.
+</p>
+
+<p>
+Grâce à l’intégration de l’IA, l’application permet non seulement de filtrer et scorer les offres selon votre profil,
+mais aussi de générer des lettres de motivation personnalisées, simuler des entretiens et fournir un coaching intelligent
+pour maximiser vos chances de réussite.
+</p>
+
+</div>
 
 ---
 
