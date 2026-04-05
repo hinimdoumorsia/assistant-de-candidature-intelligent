@@ -1,5 +1,4 @@
 <p align="center">
-
 <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white" />
 <img src="https://img.shields.io/badge/PyQt6-UI-green?logo=qt&logoColor=white" />
 <img src="https://img.shields.io/badge/Claude-AI-orange?logo=anthropic&logoColor=white" />
@@ -20,7 +19,6 @@
 <h2 style="color:#1DB954; margin-top:0;">🚀 Introduction à notre application</h2>
 
 <p>
-
 > SCA Desktop est une application intelligente conçue pour automatiser l’ensemble du processus de recherche de stages.  
 > Elle combine le scraping multi-sources, l’analyse de données et l’intelligence artificielle afin d’optimiser la détection des opportunités, améliorer la qualité des candidatures et accompagner l’utilisateur à chaque étape de son parcours.
 >
