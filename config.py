@@ -31,51 +31,73 @@ ADZUNA_API_KEY = os.getenv("ADZUNA_API_KEY", "")
 
 # ── Sources de scraping ────────────────────────────────────────────────────────
 SOURCES = {
+    # ========== SOURCES RSS (avec User-Agent pour éviter 403) ==========
     "indeed_rss": {
         "enabled": True,
         "method": "rss",
-        "url": "https://fr.indeed.com/rss?q=stage&l=Maroc",
+        "url": "https://rss.indeed.com/rss?q=stage&l=Maroc",  # URL corrigée
         "label": "Indeed",
     },
+    "bayt_rss": {
+        "enabled": True,
+        "method": "rss",
+        "url": "https://www.bayt.com/fr/morocco/jobs/rss/?search=stage",  # URL RSS corrigée
+        "label": "Bayt RSS",
+    },
+    
+    # ========== REKRUTE (sélecteurs corrigés) ==========
     "rekrute": {
         "enabled": True,
         "method": "playwright",
-        "url": "https://www.rekrute.com/offres.html",
+        "url": "https://www.rekrute.com/offres.html?q=stage&where=Maroc",  # URL avec filtres
         "label": "Rekrute",
         "selectors": {
-            "listing": ".post-id",
-            "title": "h2.title a",
-            "company": ".company",
-            "location": ".location",
-            "link": "h2.title a",
+            "listing": "div.item",           # Conteneur d'offre
+            "title": "h2.title a",           # Titre
+            "company": "div.recruteur span", # Entreprise
+            "location": "div.localite span", # Localisation
+            "link": "h2.title a",            # Lien
         },
     },
+    
+    # ========== EMPLOI.MA (sélecteurs corrigés) ==========
     "emploi_ma": {
         "enabled": True,
         "method": "playwright",
-        "url": "https://www.emploi.ma/recherche-jobs-maroc",
+        "url": "https://www.emploi.ma/recherche-jobs/stage/maroc",  # URL avec stage
         "label": "Emploi.ma",
         "selectors": {
-            "listing": ".job-list-item",
-            "title": ".job-title",
-            "company": ".company-name",
-            "location": ".job-location",
+            "listing": "article.job-listing",
+            "title": "h2.job-title a",
+            "company": "span.company-name",
+            "location": "span.location",
+            "link": "h2.job-title a",
+        },
+    },
+    
+    # ========== BAYT PLAYWRIGHT ==========
+    "bayt": {
+        "enabled": True,
+        "method": "playwright",
+        "url": "https://www.bayt.com/fr/morocco/jobs/stage/",  # URL stage
+        "label": "Bayt",
+        "selectors": {
+            "listing": "div.has-pointer",
+            "title": "a.job-title",
+            "company": "span.job-info-item span",
+            "location": "span.job-location",
             "link": "a.job-title",
         },
     },
-    "bayt": {
-        "enabled": True,
-        "method": "rss+playwright",
-        "url": "https://www.bayt.com/fr/maroc/jobs/",
-        "rss_url": "https://www.bayt.com/rss/maroc/stage-jobs/",
-        "label": "Bayt",
-    },
+    
+    # ========== ADZUNA (API temporairement désactivée) ==========
     "adzuna": {
-        "enabled": True,
+        "enabled": False,  # API retourne 404, à désactiver pour le moment
         "method": "api",
         "base_url": "https://api.adzuna.com/v1/api/jobs/ma/search",
         "label": "Adzuna",
     },
+    
     "remotive": {
         "enabled": False,
         "method": "rss",
