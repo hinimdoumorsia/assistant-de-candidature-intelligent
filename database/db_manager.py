@@ -25,6 +25,11 @@ def init_db():
     logger.info("Base de données initialisée.")
 
 
+def create_all_tables() -> None:
+    """Compatibility alias used by setup and migration checks."""
+    init_db()
+
+
 @contextmanager
 def get_session() -> Session:
     """Context manager pour une session DB avec rollback automatique."""

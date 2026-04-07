@@ -182,3 +182,62 @@ def generate_cv_pdf(cv_data: dict, output_path: str = None) -> str | None:
     except Exception as e:
         logger.error(f"Erreur génération CV PDF: {e}")
         return None
+
+
+def export_letter(content: str, profil, offre, output_path: str | None = None) -> str | None:
+    return generate_lettre_pdf(content, profil, offre, output_path)
+
+
+def export_cv(cv_data: dict, output_path: str | None = None) -> str | None:
+    return generate_cv_pdf(cv_data, output_path)
+
+
+def generate_monthly_report(user_id: int, mois: str) -> str | None:
+    """Generate a simple monthly PDF report in exports directory."""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib import colors
+        from database.db_manager import get_session
+        from database.models import Candidature, Offre
+
+        filename = EXPORTS_DIR / f"rapport_mensuel_{user_id}_{mois.replace('-', '')}.pdf"
+        doc = SimpleDocTemplate(str(filename), pagesize=A4)
+        styles = getSampleStyleSheet()
+
+        with get_session() as db:
+            rows = (
+                db.query(Candidature, Offre)
+                .join(Offre, Candidature.offre_id == Offre.id, isouter=True)
+                .filter(Candidature.profil_id.in_(
+                    db.query(Candidature.profil_id).subquery()
+                ))
+                .all()
+            )
+
+        story = [Paragraph(f"Rapport mensuel {mois}", styles["Title"]), Spacer(1, 12)]
+        table_data = [["Entreprise", "Poste", "Statut", "Date"]]
+        for cand, offer in rows:
+            table_data.append([
+                getattr(offer, "entreprise", ""),
+                getattr(offer, "titre", ""),
+                getattr(cand.statut, "value", str(cand.statut)),
+                cand.created_at.strftime("%Y-%m-%d") if cand.created_at else "",
+            ])
+        table = Table(table_data)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#5b6af0")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                ]
+            )
+        )
+        story.append(table)
+        doc.build(story)
+        return str(filename)
+    except Exception as exc:
+        logger.error("Erreur rapport mensuel: %s", exc)
+        return None

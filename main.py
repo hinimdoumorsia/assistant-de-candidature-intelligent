@@ -4,7 +4,7 @@ Lance la fenêtre de login, puis le dashboard après authentification.
 """
 import sys
 import logging
-from pathlib import Path
+import os
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 from config import LOGS_DIR
@@ -24,9 +24,23 @@ def main():
     from PyQt6.QtGui import QFont
     from config import STYLESHEET, APP_NAME
 
+    os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--enable-features=OverlayScrollbar")
+
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
-    app.setStyleSheet(STYLESHEET)
+
+    fluent_enabled = False
+    try:
+        from qfluentwidgets import setTheme, Theme, setThemeColor
+
+        setTheme(Theme.AUTO)
+        setThemeColor("#5b6af0")
+        fluent_enabled = True
+    except Exception:
+        fluent_enabled = False
+
+    if not fluent_enabled:
+        app.setStyleSheet(STYLESHEET)
 
     # Police par défaut
     font = QFont("Segoe UI", 11)

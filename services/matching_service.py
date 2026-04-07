@@ -1,141 +1,187 @@
-"""
-services/matching_service.py - TF-IDF local + Claude API scoring sémantique
-Aucun import Qt.
-"""
+"""Matching service: offline TF-IDF + Claude scoring (no Qt imports)."""
+from __future__ import annotations
+
 import json
 import logging
-from typing import Optional
-from config import GROQ_API_KEY, GROQ_MODEL, TFIDF_THRESHOLD, CLAUDE_THRESHOLD
+from collections import Counter
+from typing import Any
+
+from anthropic import Anthropic
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+from config import CLAUDE_MODEL, TFIDF_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
 
-# ── TF-IDF (pré-filtrage local, 0 token Claude) ──────────────────────────────
-
-_vectorizer = None
-_profil_vector = None
+_VECTOR = TfidfVectorizer(analyzer="word", ngram_range=(1, 2), min_df=1, max_features=10_000, sublinear_tf=True)
 
 
-def _get_vectorizer():
-    global _vectorizer
-    if _vectorizer is None:
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        _vectorizer = TfidfVectorizer(
-            analyzer="word",
-            ngram_range=(1, 2),
-            min_df=1,
-            max_features=10_000,
-            sublinear_tf=True,
-        )
-    return _vectorizer
-
-
-def build_profil_corpus(profil) -> str:
-    """Construit un texte unique à partir du profil pour TF-IDF."""
-    parts = []
-    parts.append(profil.titre or "")
-    parts.extend(profil.competences_list)
-    parts.append(profil.formation or "")
-    parts.append(profil.experience or "")
-    return " ".join(parts).lower()
-
-
-def score_tfidf(offre_text: str, profil_text: str) -> float:
-    """Calcule la similarité cosine TF-IDF entre offre et profil. Retourne 0.0-1.0."""
+def _effective_tfidf_threshold() -> float:
     try:
-        from sklearn.metrics.pairwise import cosine_similarity
-        import numpy as np
-        vect = _get_vectorizer()
-        corpus = [profil_text, offre_text]
-        tfidf_matrix = vect.fit_transform(corpus)
-        sim = cosine_similarity(tfidf_matrix[0], tfidf_matrix[1])[0][0]
-        return float(np.clip(sim, 0.0, 1.0))
-    except Exception as e:
-        logger.error(f"TF-IDF error: {e}")
+        from services.auth_service import get_current_user
+        from services.user_settings_service import load_user_settings
+
+        user = get_current_user()
+        settings = load_user_settings(getattr(user, "email", None))
+        return float(settings.get("tfidf_threshold", TFIDF_THRESHOLD))
+    except Exception:
+        return float(TFIDF_THRESHOLD)
+
+
+def _get_profile_skills(profil: Any) -> list[str]:
+    raw = getattr(profil, "competences_list", None)
+    if isinstance(raw, list):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    try:
+        parsed = json.loads(str(getattr(profil, "competences", "[]") or "[]"))
+        if isinstance(parsed, list):
+            return [str(x).strip() for x in parsed if str(x).strip()]
+    except Exception:
+        pass
+    return []
+
+
+def _profile_text(profil: Any) -> str:
+    parts = [
+        str(getattr(profil, "titre", "") or ""),
+        " ".join(_get_profile_skills(profil)),
+        str(getattr(profil, "formation", "") or ""),
+        str(getattr(profil, "experience", "") or ""),
+        str(getattr(profil, "langues", "") or ""),
+    ]
+    return " ".join(parts).strip().lower()
+
+
+def tfidf_score(offre: Any, profil: Any) -> float:
+    """Returns cosine similarity in range [0, 1]."""
+    try:
+        offer_text = " ".join(
+            [
+                str(getattr(offre, "titre", "") or ""),
+                str(getattr(offre, "description", "") or ""),
+                str(getattr(offre, "entreprise", "") or ""),
+            ]
+        ).lower()
+        prof_text = _profile_text(profil)
+        if not offer_text.strip() or not prof_text.strip():
+            return 0.0
+
+        matrix = _VECTOR.fit_transform([prof_text, offer_text])
+        sim = float(cosine_similarity(matrix[0:1], matrix[1:2]).ravel()[0])
+        return max(0.0, min(1.0, sim))
+    except Exception as exc:
+        logger.error("TF-IDF error: %s", exc)
         return 0.0
 
 
-# ── Claude API scoring fin ────────────────────────────────────────────────────
+def claude_score(offre: Any, profil: Any, api_key: str) -> dict[str, Any]:
+    """Returns Claude JSON scoring payload expected by the pipeline."""
+    key = (api_key or "").strip()
+    if not key:
+        return {
+            "score": None,
+            "competences_matchees": [],
+            "competences_manquantes": [],
+            "recommandation": "Clé Claude absente",
+        }
 
-def score_groq(offre: dict, profil) -> Optional[dict]:
-    """
-    Scoring sémantique fin via Groq API.
-    Retourne dict: {score, competences_matchees, competences_manquantes, recommandation}
-    ou None si API indisponible / offre sous seuil.
-    """
-    if not GROQ_API_KEY:
-        logger.warning("GROQ_API_KEY non configurée, scoring Groq ignoré.")
-        return None
+    profile_skills = _get_profile_skills(profil)
+    client = Anthropic(api_key=key)
+    prompt = (
+        "Analyse la compatibilite stage en JSON strict. Reponds uniquement avec un objet JSON ayant "
+        "les champs score (0-100), competences_matchees (liste), competences_manquantes (liste), "
+        "recommandation (texte court).\n"
+        f"PROFIL: titre={getattr(profil, 'titre', '')}; competences={', '.join(profile_skills)}; "
+        f"formation={getattr(profil, 'formation', '')}; experience={getattr(profil, 'experience', '')}.\n"
+        f"OFFRE: titre={getattr(offre, 'titre', '')}; entreprise={getattr(offre, 'entreprise', '')}; "
+        f"localisation={getattr(offre, 'localisation', '')}; description={str(getattr(offre, 'description', '') or '')[:2000]}"
+    )
 
     try:
-        import groq
-        client = groq.Client(api_key=GROQ_API_KEY)
-
-        prompt = f"""Tu es un expert RH. Analyse la compatibilité entre ce profil candidat et cette offre de stage.
-
-PROFIL:
-- Titre: {profil.titre}
-- Compétences: {', '.join(profil.competences_list)}
-- Formation: {profil.formation}
-- Expérience: {profil.experience}
-- Langues: {profil.langues}
-- Localisation: {profil.localisation}
-- Disponibilité: {profil.disponibilite}
-
-OFFRE:
-- Titre: {offre.get('titre', '')}
-- Entreprise: {offre.get('entreprise', '')}
-- Localisation: {offre.get('localisation', '')}
-- Description: {offre.get('description', '')[:1500]}
-
-Réponds UNIQUEMENT en JSON valide avec cette structure exacte:
-{{
-  "score": <entier 0-100>,
-  "competences_matchees": ["comp1", "comp2"],
-  "competences_manquantes": ["comp1", "comp2"],
-  "recommandation": "<phrase courte d'évaluation>"
-}}"""
-
-        response = client.chat.completions.create(
-            model=GROQ_MODEL,
+        response = client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=500,
+            temperature=0.2,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=400,
         )
-        raw = response.choices[0].message.content.strip()
-        # Extraire le JSON si entouré de backticks
-        if "```" in raw:
-            raw = raw.split("```")[1].replace("json", "").strip()
-        result = json.loads(raw)
-        return result
-    except Exception as e:
-        logger.error(f"Groq scoring error: {e}")
-        return None
+        text = ""
+        for block in response.content:
+            if getattr(block, "type", "") == "text":
+                text += getattr(block, "text", "")
 
+        text = text.strip()
+        if "```" in text:
+            parts = text.split("```")
+            text = parts[1].replace("json", "").strip() if len(parts) > 1 else text
 
-def match_offre_profil(offre, profil) -> dict:
-    """
-    Pipeline complet: TF-IDF → Claude si nécessaire.
-    Retourne un dict avec tous les scores.
-    """
-    profil_text = build_profil_corpus(profil)
-    offre_text  = f"{offre.titre} {offre.description}".lower()
-
-    tfidf = score_tfidf(offre_text, profil_text)
-
-    claude_result = None
-    if tfidf >= TFIDF_THRESHOLD:
-        offre_dict = {
-            "titre": offre.titre,
-            "entreprise": offre.entreprise,
-            "localisation": offre.localisation,
-            "description": offre.description,
+        payload = json.loads(text)
+        return {
+            "score": int(payload.get("score", 0)),
+            "competences_matchees": list(payload.get("competences_matchees", [])),
+            "competences_manquantes": list(payload.get("competences_manquantes", [])),
+            "recommandation": str(payload.get("recommandation", "")),
         }
-        groq_result = score_groq(offre_dict, profil)
+    except Exception as exc:
+        logger.error("Claude scoring error: %s", exc)
+        return {
+            "score": None,
+            "competences_matchees": [],
+            "competences_manquantes": [],
+            "recommandation": "Erreur Claude",
+        }
 
-    return {
-        "score_tfidf": tfidf,
-        "score_claude": groq_result.get("score") if groq_result else None,
-        "competences_matchees": claude_result.get("competences_matchees", []) if claude_result else [],
-        "competences_manquantes": claude_result.get("competences_manquantes", []) if claude_result else [],
-        "recommandation": claude_result.get("recommandation", "") if claude_result else "",
+
+def match_offre_profil(offre: Any, profil: Any, api_key: str = "") -> dict[str, Any]:
+    """Complete pipeline helper used by worker code."""
+    score_local = tfidf_score(offre, profil)
+    result: dict[str, Any] = {
+        "score_tfidf": score_local,
+        "score_claude": None,
+        "competences_matchees": [],
+        "competences_manquantes": [],
+        "recommandation": "",
     }
+    if score_local >= _effective_tfidf_threshold():
+        fine = claude_score(offre, profil, api_key)
+        result["score_claude"] = fine.get("score")
+        result["competences_matchees"] = fine.get("competences_matchees", [])
+        result["competences_manquantes"] = fine.get("competences_manquantes", [])
+        result["recommandation"] = fine.get("recommandation", "")
+    return result
+
+
+def market_score(user_id: int) -> dict[str, Any]:
+    """Computes top missing market skills from seen offers vs user profile."""
+    from database.db_manager import get_session
+    from database.models import Offre, Profil
+
+    with get_session() as db:
+        profil = db.query(Profil).filter_by(user_id=user_id).first()
+        if profil is None:
+            return {"competences_manquantes_top5": [], "suggestions": []}
+
+        offers = db.query(Offre).order_by(Offre.date_detection.desc()).limit(200).all()
+        if len(offers) < 30:
+            return {"competences_manquantes_top5": [], "suggestions": []}
+
+        known = {x.lower() for x in _get_profile_skills(profil)}
+        tokens = []
+        for offer in offers:
+            txt = f"{offer.titre} {offer.description}".lower()
+            for token in txt.replace("/", " ").replace(",", " ").split():
+                if len(token) >= 4:
+                    tokens.append(token)
+
+        counts = Counter(tokens)
+        missing = [w for w, _n in counts.most_common(30) if w not in known][:5]
+        suggestions = [f"Ajouter une experience concretisant {m}" for m in missing]
+        return {
+            "competences_manquantes_top5": missing,
+            "suggestions": suggestions,
+        }
+
+
+# Backward-compatible aliases
+score_tfidf = tfidf_score

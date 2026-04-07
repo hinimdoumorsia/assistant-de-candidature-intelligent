@@ -12,9 +12,17 @@ BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 EXPORTS_DIR = BASE_DIR / "exports"
 LOGS_DIR = BASE_DIR / "logs"
+ENV_PATH = BASE_DIR / ".env"
 
 for d in (DATA_DIR, EXPORTS_DIR, LOGS_DIR):
     d.mkdir(exist_ok=True)
+
+if ENV_PATH.exists():
+    try:
+        os.chmod(ENV_PATH, 0o600)
+    except Exception:
+        # On Windows, chmod can be partially unsupported depending on filesystem.
+        pass
 
 # ── Base de données ────────────────────────────────────────────────────────────
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR}/sca_data.db")
@@ -23,7 +31,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR}/sca_data.db")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL   = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
-CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "")
+CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", os.getenv("ANTHROPIC_KEY", ""))
 CLAUDE_MODEL   = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
 
 ADZUNA_APP_ID  = os.getenv("ADZUNA_APP_ID", "")
@@ -87,7 +95,7 @@ SOURCES = {
 # ── Scraping & Matching ────────────────────────────────────────────────────────
 SCRAPE_INTERVAL_MINUTES = 30
 TFIDF_THRESHOLD         = 0.40
-CLAUDE_THRESHOLD        = 40
+CLAUDE_THRESHOLD        = 60
 DEDUP_COSINE_THRESHOLD  = 0.85
 MAX_OFFERS_PER_RUN      = 50
 

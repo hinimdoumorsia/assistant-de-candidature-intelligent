@@ -11,32 +11,33 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QRect, QPoint
 from PyQt6.QtGui import QColor, QPainter, QLinearGradient, QBrush, QFont
+from config import COLORS
 
-# ── Palette blanc / vert / bleu ───────────────────────────────────────────────
-BG_PAGE    = "#f0f4f8"       # fond gris très clair
-BG_CARD    = "#ffffff"       # cartes blanches
-BG_INPUT   = "#f8fafc"       # inputs légèrement grisés
-BORDER     = "#e2e8f0"       # bordures légères
-BORDER_FOC = "#3b82f6"       # focus bleu
+# ── Palette harmonisée Fluent ─────────────────────────────────────────────────
+BG_PAGE    = COLORS["bg"]
+BG_CARD    = COLORS["bg_card"]
+BG_INPUT   = COLORS["bg_input"]
+BORDER     = COLORS["border"]
+BORDER_FOC = COLORS["primary"]
 
-GREEN      = "#16a34a"       # vert principal
-GREEN_LT   = "#dcfce7"       # vert clair (bg badges)
-GREEN_MID  = "#22c55e"       # vert moyen
-BLUE       = "#3b82f6"       # bleu principal
-BLUE_LT    = "#dbeafe"       # bleu clair
-BLUE_DARK  = "#1d4ed8"       # bleu foncé hover
-PURPLE     = "#8b5cf6"       # violet dégradé
+GREEN      = COLORS["success"]
+GREEN_LT   = f"{COLORS['success']}22"
+GREEN_MID  = COLORS["success"]
+BLUE       = COLORS["primary"]
+BLUE_LT    = COLORS["primary_light"]
+BLUE_DARK  = COLORS["primary_dark"]
+PURPLE     = COLORS["purple"]
 
-RED        = "#ef4444"
-RED_LT     = "#fee2e2"
+RED        = COLORS["danger"]
+RED_LT     = f"{COLORS['danger']}18"
 
-TEXT_PRI   = "#0f172a"       # texte principal quasi noir
-TEXT_SEC   = "#64748b"       # texte secondaire gris-bleu
-TEXT_MUT   = "#94a3b8"       # texte mutté
+TEXT_PRI   = COLORS["text"]
+TEXT_SEC   = COLORS["text_light"]
+TEXT_MUT   = "#94a3b8"
 
-TAG_BG     = "#dbeafe"
-TAG_BORDER = "#93c5fd"
-TAG_TEXT   = "#1d4ed8"
+TAG_BG     = COLORS["primary_light"]
+TAG_BORDER = COLORS["primary"]
+TAG_TEXT   = COLORS["primary_dark"]
 
 
 # ── FlowLayout custom ─────────────────────────────────────────────────────────

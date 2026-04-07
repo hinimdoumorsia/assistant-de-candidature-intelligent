@@ -53,7 +53,7 @@ class ChatBubble(QFrame):
             layout.addWidget(lbl)
         else:
             lbl.setStyleSheet(f"""
-                background: white;
+                background: {COLORS['bg_card']};
                 color: {COLORS['text']};
                 border: 1.5px solid {COLORS['card_border']};
                 border-radius: 14px 14px 14px 4px;
@@ -145,7 +145,7 @@ class InterviewSimulatorWidget(QWidget):
 
     def _info_box(self, text: str, color: str = None) -> QFrame:
         card = QFrame()
-        c = color or COLORS["veryLightBlue"] if hasattr(COLORS, "veryLightBlue") else "#DEEAF1"
+        c = color or COLORS.get("primary_light", "#DEEAF1")
         card.setStyleSheet(f"background: {COLORS['bg_dark']}; border-radius: 10px; border: 1px solid {COLORS['card_border']};")
         cl = QVBoxLayout(card)
         cl.setContentsMargins(16, 14, 16, 14)
@@ -159,7 +159,7 @@ class InterviewSimulatorWidget(QWidget):
         card = QFrame()
         card.setStyleSheet(f"""
             QFrame {{
-                background: white;
+                background: {COLORS['bg_card']};
                 border-left: 4px solid {color};
                 border-radius: 0 10px 10px 0;
                 border-top: 1px solid {COLORS['card_border']};
@@ -268,7 +268,7 @@ class InterviewSimulatorWidget(QWidget):
 
         # Saisie
         input_frame = QFrame()
-        input_frame.setStyleSheet(f"background: white; border-radius: 0 0 10px 10px; border-top: 1px solid {COLORS['card_border']};")
+        input_frame.setStyleSheet(f"background: {COLORS['bg_card']}; border-radius: 0 0 10px 10px; border-top: 1px solid {COLORS['card_border']};")
         il = QHBoxLayout(input_frame)
         il.setContentsMargins(12, 10, 12, 10)
         il.setSpacing(10)
@@ -392,7 +392,7 @@ class InterviewSimulatorWidget(QWidget):
         # Score global
         score = data.get("score_global", 0)
         sc_card = QFrame()
-        sc_card.setStyleSheet(f"background: white; border-radius: 12px; border: 1.5px solid {COLORS['card_border']};")
+        sc_card.setStyleSheet(f"background: {COLORS['bg_card']}; border-radius: 12px; border: 1.5px solid {COLORS['card_border']};")
         scl = QHBoxLayout(sc_card)
         scl.setContentsMargins(20, 16, 20, 16)
         sc_icon = QLabel("📊")

@@ -1,187 +1,227 @@
-"""
-ui/notification_popup.py - Popup offre + QWizard dépôt assisté
-"""
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFrame, QWizard, QWizardPage, QTextEdit, QMessageBox
+"""Fluent offer notification popup using Flyout/FlyoutView."""
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
+
+from qfluentwidgets import (
+    Action,
+    BodyLabel,
+    Flyout,
+    FlyoutAnimationType,
+    FlyoutView,
+    InfoBar,
+    InfoBarPosition,
+    PillPushButton,
+    PrimaryPushButton,
+    PushButton,
+    RoundMenu,
+    SubtitleLabel,
+    TitleLabel,
 )
-from PyQt6.QtCore import Qt
-from config import COLORS
+
+from ui.lottie_widget import LottieWidget
 
 
-class OfferDetailDialog(QDialog):
-    """Popup de détail d'une offre avec score + actions."""
+class _ConfettiOverlay(QWidget):
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.setGeometry(parent.rect())
+        self.lottie = LottieWidget("assets/lottie/confetti.json", loop=False, parent=self)
+        self.lottie.setGeometry(self.rect())
+
+
+class OfferFlyoutView(FlyoutView):
+    """Composable Fluent view for offer actions and score context."""
+
+    def __init__(self, title: str, entreprise: str, ville: str, score: str, tags_ok: list[str], tags_missing: list[str], parent=None):
+        super().__init__(title="Nouvelle offre", content="", parent=parent)
+
+        root = QVBoxLayout()
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(8)
+
+        root.addWidget(TitleLabel(title))
+        root.addWidget(SubtitleLabel(f"{entreprise} | {ville}"))
+        root.addWidget(BodyLabel(f"Score : {score}/100"))
+
+        tags_row = QHBoxLayout()
+        for tag in tags_ok[:4]:
+            chip = PillPushButton(tag)
+            chip.setStyleSheet("background:#16a34a;color:white;")
+            tags_row.addWidget(chip)
+        for tag in tags_missing[:4]:
+            chip = PillPushButton(tag)
+            chip.setStyleSheet("background:#f59e0b;color:#1f2937;")
+            tags_row.addWidget(chip)
+        tags_row.addStretch(1)
+        root.addLayout(tags_row)
+
+        action_row = QHBoxLayout()
+        self.postuler_btn = PrimaryPushButton("Postuler")
+        self.snooze_btn = PushButton("Snooze")
+        self.ignore_btn = PushButton("Ignorer")
+        self.coach_btn = PushButton("💡 Voir analyse coach IA")
+        action_row.addWidget(self.postuler_btn)
+        action_row.addWidget(self.snooze_btn)
+        action_row.addWidget(self.ignore_btn)
+        action_row.addWidget(self.coach_btn)
+        root.addLayout(action_row)
+        self.setLayout(root)
+
+
+class OfferDetailDialog:
+    """Backward-compatible wrapper that now renders a Fluent flyout instead of QDialog."""
 
     def __init__(self, offer_title: str, parent=None, offre=None):
-        super().__init__(parent)
+        self.offer_title = offer_title
+        self.parent = parent
         self.offre = offre
-        self.setWindowTitle("Détail de l'offre")
-        self.setMinimumSize(560, 400)
-        self._setup_ui(offer_title)
 
-    def _setup_ui(self, title: str):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 24, 28, 24)
-        layout.setSpacing(16)
-
-        # Header coloré
-        header = QFrame()
-        header.setStyleSheet(f"background: {COLORS['primary_dark']}; border-radius: 10px;")
-        hl = QVBoxLayout(header)
-        hl.setContentsMargins(20, 16, 20, 16)
-        t = QLabel(title)
-        t.setStyleSheet("color: white; font-size: 16px; font-weight: 700;")
-        t.setWordWrap(True)
-        hl.addWidget(t)
-        layout.addWidget(header)
-
-        # Scores
-        if self.offre:
-            sc_row = QHBoxLayout()
-            tfidf = QLabel(f"TF-IDF: {self.offre.score_tfidf*100:.0f}%")
-            tfidf.setStyleSheet(f"background: {COLORS['primary_light']}; color: {COLORS['primary_dark']}; padding: 6px 14px; border-radius: 16px; font-weight: 600;")
-            cl = f"{self.offre.score_claude:.0f}/100" if self.offre.score_claude else "—"
-            claude_lbl = QLabel(f"Score IA: {cl}")
-            claude_lbl.setStyleSheet(f"background: {COLORS['accent_light']}; color: #7B341E; padding: 6px 14px; border-radius: 16px; font-weight: 600;")
-            sc_row.addWidget(tfidf)
-            sc_row.addWidget(claude_lbl)
-            sc_row.addStretch()
-            layout.addLayout(sc_row)
-
-            desc = QTextEdit()
-            desc.setPlainText(self.offre.description or "Aucune description disponible.")
-            desc.setReadOnly(True)
-            desc.setMaximumHeight(160)
-            layout.addWidget(desc)
-
-        # Boutons
-        btn_row = QHBoxLayout()
-        btn_postuler = QPushButton("📤 Préparer le dépôt")
-        btn_postuler.clicked.connect(lambda: (self.close(), DepotWizard(self.parent()).exec()))
-        btn_close = QPushButton("Fermer")
-        btn_close.setProperty("class", "secondary")
-        btn_close.clicked.connect(self.close)
-        btn_row.addWidget(btn_postuler)
-        btn_row.addWidget(btn_close)
-        layout.addLayout(btn_row)
+    def exec(self) -> int:
+        show_offer_flyout(self.parent, self.offre or self.offer_title)
+        return 1
 
 
-class DepotWizard(QWizard):
-    """QWizard 3 étapes pour le dépôt assisté."""
+def _show_confetti(parent: QWidget | None) -> None:
+    if parent is None:
+        return
+    overlay = _ConfettiOverlay(parent)
+    overlay.show()
+    QTimer.singleShot(3000, overlay.deleteLater)
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Préparer le dépôt")
-        self.setMinimumSize(620, 480)
-        self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
-        self.setStyleSheet(f"""
-            QWizard {{ background: {COLORS['bg']}; }}
-            QWizard QPushButton {{
-                background: {COLORS['primary']};
-                color: white; border: none; border-radius: 8px;
-                padding: 10px 22px; font-weight: 600;
-            }}
-            QWizard QPushButton:hover {{ background: {COLORS['primary_dark']}; }}
-        """)
 
-        self.addPage(self._page_lettre())
-        self.addPage(self._page_depot())
-        self.addPage(self._page_confirmation())
+def show_offer_flyout(parent: QWidget | None, offre) -> None:
+    """Shows Fluent offer details/actions with optional confetti on first deposit."""
+    if parent is None:
+        return
+    title = getattr(offre, "titre", str(offre))
+    entreprise = getattr(offre, "entreprise", "Entreprise")
+    ville = getattr(offre, "localisation", "Ville")
+    score_num = getattr(offre, "score_claude", None)
+    if score_num is None:
+        score_num = int(float(getattr(offre, "score_tfidf", 0.0)) * 100)
 
-    def _page_lettre(self) -> QWizardPage:
-        page = QWizardPage()
-        page.setTitle("Étape 1 — Lettre de motivation")
-        page.setSubTitle("Choisissez la variante de lettre à utiliser.")
-        layout = QVBoxLayout(page)
-        layout.setSpacing(16)
+    view = OfferFlyoutView(
+        title=title,
+        entreprise=entreprise,
+        ville=ville,
+        score=str(int(score_num or 0)),
+        tags_ok=["Python", "SQL", "Communication"],
+        tags_missing=["Docker", "CI/CD"],
+    )
 
-        for i, (label, desc) in enumerate([
-            ("Variante Technique", "Met en avant vos compétences et réalisations concrètes."),
-            ("Variante Humaine",   "Met en avant votre motivation et vos valeurs."),
-            ("Variante Projet",    "Met en avant votre vision et votre apport stratégique."),
-        ], 1):
-            card = QFrame()
-            card.setStyleSheet(f"background: white; border: 2px solid {COLORS['card_border']}; border-radius: 10px;")
-            cl = QHBoxLayout(card)
-            cl.setContentsMargins(16, 14, 16, 14)
-            lbl_num = QLabel(str(i))
-            lbl_num.setStyleSheet(f"background: {COLORS['primary']}; color: white; border-radius: 14px; padding: 6px 12px; font-weight: 700; font-size: 14px;")
-            lbl_num.setFixedSize(32, 32)
-            lbl_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            col = QVBoxLayout()
-            col.addWidget(QLabel(f"<b>{label}</b>"))
-            desc_lbl = QLabel(desc)
-            desc_lbl.setStyleSheet(f"color: {COLORS['text_light']};")
-            col.addWidget(desc_lbl)
-            cl.addWidget(lbl_num)
-            cl.addLayout(col)
-            layout.addWidget(card)
-        return page
+    def _postuler() -> None:
+        _show_confetti(parent)
+        InfoBar.success(
+            title="Candidature",
+            content="Action Postuler lancee. Finalisez le depot manuellement.",
+            parent=parent,
+            position=InfoBarPosition.TOP_RIGHT,
+        )
 
-    def _page_depot(self) -> QWizardPage:
-        page = QWizardPage()
-        page.setTitle("Étape 2 — Ouverture du site")
-        page.setSubTitle("Suivez ces instructions pour déposer votre candidature.")
-        layout = QVBoxLayout(page)
-        layout.setSpacing(12)
-
-        steps = [
-            ("🌐", "Le lien de l'offre va s'ouvrir dans votre navigateur."),
-            ("📋", "Vos données (nom, email, lettre) sont copiées dans le presse-papier."),
-            ("📝", "Collez et complétez le formulaire sur le site de l'entreprise."),
-            ("✅", "Confirmez le dépôt ici une fois terminé."),
-        ]
-        for icon, text in steps:
-            row = QHBoxLayout()
-            il = QLabel(icon)
-            il.setStyleSheet("font-size: 22px;")
-            il.setFixedWidth(36)
-            tl = QLabel(text)
-            tl.setWordWrap(True)
-            tl.setStyleSheet("font-size: 13px;")
-            row.addWidget(il)
-            row.addWidget(tl)
-            layout.addLayout(row)
-
-        layout.addSpacing(12)
-        btn_open = QPushButton("🔗 Ouvrir le lien dans le navigateur")
-        btn_open.clicked.connect(self._open_link)
-        layout.addWidget(btn_open)
-
-        btn_copy = QPushButton("📋 Copier mes données")
-        btn_copy.setProperty("class", "secondary")
-        btn_copy.clicked.connect(self._copy_data)
-        layout.addWidget(btn_copy)
-        return page
-
-    def _page_confirmation(self) -> QWizardPage:
-        page = QWizardPage()
-        page.setTitle("Étape 3 — Confirmation")
-        page.setSubTitle("Confirmez que vous avez bien déposé votre candidature.")
-        layout = QVBoxLayout(page)
-        layout.setSpacing(16)
-
-        success_icon = QLabel("🎉")
-        success_icon.setStyleSheet("font-size: 48px;")
-        success_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(success_icon)
-
-        msg = QLabel("Si vous avez soumis votre candidature, cliquez sur Terminer.\n"
-                     "Le statut sera mis à jour automatiquement dans votre historique.")
-        msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        msg.setWordWrap(True)
-        msg.setStyleSheet(f"color: {COLORS['text_light']}; font-size: 13px;")
-        layout.addWidget(msg)
-        return page
-
-    def _open_link(self):
-        import webbrowser
-        webbrowser.open("https://www.rekrute.com/offres.html")
-
-    def _copy_data(self):
+    def _mark_ignored() -> None:
         try:
-            import pyperclip
-            pyperclip.copy("Nom: [Votre Nom]\nEmail: [Votre Email]\nPoste: [Titre]\nLettre: [Voir fichier lettre.pdf]")
-            QMessageBox.information(self, "Copié", "Données copiées dans le presse-papier !")
-        except ImportError:
-            QMessageBox.warning(self, "Erreur", "pyperclip non installé.")
+            from database.db_manager import get_session
+            from database.models import Offre, StatutOffre
+
+            offer_id = getattr(offre, "id", None)
+            if offer_id is not None:
+                with get_session() as db:
+                    found = db.get(Offre, int(offer_id))
+                    if found is not None:
+                        found.statut = StatutOffre.traitee
+        except Exception:
+            pass
+        _simple_action("Ignorer")
+
+    def _snooze_for(days: int) -> None:
+        try:
+            from apscheduler.schedulers.background import BackgroundScheduler
+            from database.db_manager import get_session
+            from database.models import Snooze
+            from services.auth_service import get_current_user
+            from services.notification_service import trigger
+
+            offer_id = getattr(offre, "id", None)
+            user = get_current_user()
+            if offer_id is not None and user is not None:
+                with get_session() as db:
+                    run_at = datetime.utcnow() + timedelta(days=days)
+                    snooze = Snooze(
+                        offre_id=int(offer_id),
+                        user_id=int(getattr(user, "id", 0) or 0),
+                        snooze_until=run_at,
+                    )
+                    db.add(snooze)
+
+                sched = BackgroundScheduler()
+                sched.start()
+                sched.add_job(lambda: trigger(int(offer_id)), "date", run_date=run_at)
+        except Exception:
+            pass
+        _simple_action(f"Snooze {days}j")
+
+    def _open_coach_analysis() -> None:
+        try:
+            from services.auth_service import get_current_user, get_runtime_claude_key
+            from services.generator_service import coach_analyse
+            from services.profile_service import get_profils
+
+            user = get_current_user()
+            profils = get_profils()
+            if user is None or not profils:
+                return
+            payload = coach_analyse(offre, profils[0], get_runtime_claude_key()) or {}
+
+            lines = []
+            forts = payload.get("points_forts", [])
+            miss = payload.get("mots_cles_manquants", [])
+            reform = payload.get("reformulations", [])
+            if forts:
+                lines.append("Points forts: " + ", ".join(forts[:5]))
+            if miss:
+                lines.append("Mots-clés manquants: " + ", ".join(miss[:5]))
+            if reform:
+                lines.append("Reformulations: " + " | ".join(reform[:3]))
+            detail = "\n".join(lines) if lines else "Analyse indisponible"
+
+            coach_view = FlyoutView(title="Analyse coach IA", content=detail, parent=parent)
+            Flyout.make(view=coach_view, target=parent, parent=parent, aniType=FlyoutAnimationType.DROP_DOWN)
+        except Exception:
+            pass
+
+    def _open_snooze_menu() -> None:
+        menu = RoundMenu(parent=parent)
+        action_1 = Action("Snooze 1 jour", menu)
+        action_3 = Action("Snooze 3 jours", menu)
+        action_7 = Action("Snooze 7 jours", menu)
+        action_1.triggered.connect(lambda: _snooze_for(1))
+        action_3.triggered.connect(lambda: _snooze_for(3))
+        action_7.triggered.connect(lambda: _snooze_for(7))
+        menu.addAction(action_1)
+        menu.addAction(action_3)
+        menu.addAction(action_7)
+        menu.exec(view.snooze_btn.mapToGlobal(view.snooze_btn.rect().bottomLeft()))
+
+    def _simple_action(action: str) -> None:
+        InfoBar.info(
+            title="Action",
+            content=f"{action} appliquee pour cette offre.",
+            parent=parent,
+            position=InfoBarPosition.TOP_RIGHT,
+        )
+
+    view.postuler_btn.clicked.connect(_postuler)
+    view.snooze_btn.clicked.connect(_open_snooze_menu)
+    view.ignore_btn.clicked.connect(_mark_ignored)
+    view.coach_btn.clicked.connect(_open_coach_analysis)
+
+    Flyout.make(
+        view=view,
+        target=parent,
+        parent=parent,
+        aniType=FlyoutAnimationType.DROP_DOWN,
+    )

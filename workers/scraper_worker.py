@@ -11,64 +11,61 @@ logger = logging.getLogger(__name__)
 
 _scheduler = None
 _running    = False
+_on_new_offers_callback = None
 
 
 def _run_scrape_cycle():
     """Un cycle complet de scraping + matching + sauvegarde."""
-    from services.scraper_service import scrape_all, save_offers_to_db
-    from services.matching_service import match_offre_profil, build_profil_corpus
-    from services.auth_service import get_current_user
-    from services.profile_service import get_profils
-    from database.db_manager import get_session
-    from database.models import Offre
+    from services.scraper_service import process_and_save_offers, scrape_all
 
+    global _on_new_offers_callback
     logger.info(f"[{datetime.now()}] Cycle de scraping démarré")
     try:
         raw_offers = scrape_all()
-        saved = save_offers_to_db(raw_offers)
-
-        # Scoring TF-IDF sur les nouvelles offres
-        user = get_current_user()
-        if user:
-            profils = get_profils()
-            if profils:
-                profil = profils[0]  # Profil principal
-                with get_session() as db:
-                    new_offers = db.query(Offre).filter(
-                        Offre.score_tfidf == 0.0
-                    ).limit(50).all()
-                    for offre in new_offers:
-                        from services.matching_service import score_tfidf, build_profil_corpus
-                        pt = build_profil_corpus(profil)
-                        ot = f"{offre.titre} {offre.description}".lower()
-                        offre.score_tfidf = score_tfidf(ot, pt)
+        saved = process_and_save_offers(raw_offers)
 
         logger.info(f"Cycle terminé. {saved} nouvelles offres.")
+        if saved > 0 and callable(_on_new_offers_callback):
+            try:
+                _on_new_offers_callback(saved)
+            except Exception as callback_error:
+                logger.debug(f"Callback offres error: {callback_error}")
     except Exception as e:
         logger.error(f"Erreur cycle scraping: {e}")
 
 
 def start_worker(on_new_offers_callback=None):
     """Démarre le scheduler APScheduler dans un thread daemon."""
-    global _scheduler, _running
+    global _scheduler, _running, _on_new_offers_callback
     if _running:
         logger.warning("Worker déjà actif.")
         return
 
+    _on_new_offers_callback = on_new_offers_callback
+
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
+        from services.auth_service import get_current_user
+        from services.user_settings_service import load_user_settings
+
+        interval = SCRAPE_INTERVAL_MINUTES
+        user = get_current_user()
+        if user:
+            settings = load_user_settings(user.email)
+            interval = int(settings.get("scrape_interval_minutes", SCRAPE_INTERVAL_MINUTES))
+            interval = max(15, min(120, interval))
 
         _scheduler = BackgroundScheduler()
         _scheduler.add_job(
             _run_scrape_cycle,
             trigger="interval",
-            minutes=SCRAPE_INTERVAL_MINUTES,
+            minutes=interval,
             id="scrape_job",
             next_run_time=datetime.now(),  # Lance immédiatement au démarrage
         )
         _scheduler.start()
         _running = True
-        logger.info(f"Worker démarré (intervalle: {SCRAPE_INTERVAL_MINUTES} min)")
+        logger.info(f"Worker démarré (intervalle: {interval} min)")
     except ImportError:
         logger.error("APScheduler non installé.")
     except Exception as e:
@@ -79,6 +76,7 @@ def stop_worker():
     global _scheduler, _running
     if _scheduler and _running:
         _scheduler.shutdown(wait=False)
+        _scheduler = None
         _running = False
         logger.info("Worker arrêté.")
 
