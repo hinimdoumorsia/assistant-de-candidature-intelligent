@@ -361,7 +361,7 @@ Notification si score ≥ seuil configuré
 
 ### 9.1 Clés API — Risques critiques
 
-#### ❌ JAMAIS FAIRE
+####  JAMAIS FAIRE
 
 ```python
 # NE JAMAIS écrire une clé en dur dans le code
@@ -373,7 +373,7 @@ CLAUDE_API_KEY = "sk-ant-api03-MaCle..."  # DANGER
 git add .env  # DANGER — votre clé sera publique sur GitHub
 ```
 
-#### ✅ TOUJOURS FAIRE
+####  TOUJOURS FAIRE
 
 ```python
 # Charger depuis les variables d'environnement
